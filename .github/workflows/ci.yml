@@ -18,6 +18,13 @@ jobs:
         uses: nullplatform/github-action-setup-ci@v1
         with:
           api-key: ${{ secrets.NULLPLATFORM_API_KEY }}
+      - name: Push metadata
+        run: |
+          curl https://cli.nullplatform.com/install.sh | sh
+          export COVERAGE=$(cat Coverage.json| jq .coverage)
+          export DATA='{"coverage":{"percent":'$COVERAGE'}}'
+          echo $DATA
+          np metadata create --entity build --data "$DATA"
     outputs:
       application-id: ${{ steps.setup-ci.outputs.application-id }}
       application-name: ${{ steps.setup-ci.outputs.application-name }}
@@ -42,13 +49,6 @@ jobs:
           name: ${{ matrix.asset }}-asset
           type: ${{ matrix.asset }}
           arguments: build-${{ matrix.asset }}
-      - name: Push metadata
-        run: |
-          curl https://cli.nullplatform.com/install.sh | sh
-          export COVERAGE=$(cat Coverage.json| jq .coverage)
-          export DATA='{"coverage":{"percent":'$COVERAGE'}}'
-          echo $DATA
-          np metadata create --entity build --data "$DATA"
       - name: Push asset for ${{ needs.prepare.outputs.application-name }} and asset type {{ matrix.asset }}
         id: push-asset
         uses: nullplatform/github-action-asset-push@v1
