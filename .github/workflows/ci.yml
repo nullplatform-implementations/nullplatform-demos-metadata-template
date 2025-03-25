@@ -1,4 +1,6 @@
 name: ci-nullplatform
+env:
+  NULLPLATFORM_API_KEY: ${{ secrets.NULLPLATFORM_API_KEY }}
 on:
   push:
     branches:
