@@ -18,11 +18,18 @@ jobs:
         uses: nullplatform/github-action-setup-ci@v1
         with:
           api-key: ${{ secrets.NULLPLATFORM_API_KEY }}
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Push metadata
         run: |
           curl https://cli.nullplatform.com/install.sh | sh
-          export COVERAGE=$(cat Coverage.json| jq .coverage)
+          export COVERAGE=$(cat coverage_report.json| jq .coverage)
           export DATA='{"coverage":{"percent":'$COVERAGE'}}'
+          echo $DATA
+          np metadata create --entity build --data "$DATA"
+
+          export VULS=$(cat vulnerabilityChecks.json)
+          export DATA='{"security":'$VULS'}'
           echo $DATA
           np metadata create --entity build --data "$DATA"
     outputs:
