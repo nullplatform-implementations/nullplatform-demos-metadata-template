@@ -40,6 +40,13 @@ jobs:
           name: ${{ matrix.asset }}-asset
           type: ${{ matrix.asset }}
           arguments: build-${{ matrix.asset }}
+      - name: Push metadata
+        run: |
+          curl https://cli.nullplatform.com/install.sh | sh
+          export COVERAGE=$(cat Coverage.json| jq .coverage)
+          export DATA='{"coverage":{"percent":'$COVERAGE'}}'
+          echo $DATA
+          np metadata create --entity build --data "$DATA"
       - name: Push asset for ${{ needs.prepare.outputs.application-name }} and asset type {{ matrix.asset }}
         id: push-asset
         uses: nullplatform/github-action-asset-push@v1
