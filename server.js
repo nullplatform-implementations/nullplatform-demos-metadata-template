@@ -18,6 +18,17 @@ fastify.get('/health', async (request, reply) => {
     return { status: 'ok' };
 });
 
+// Error endpoints
+fastify.get('/error500', async (request, reply) => {
+    reply.code(500);
+    return 'Internal Server Error';
+});
+
+fastify.get('/error400', async (request, reply) => {
+    reply.code(400);
+    return 'Bad Request';
+});
+
 // Fetch Weather
 fastify.get('/weather', async (request, reply) => {
     const { query, cache } = request.query;
