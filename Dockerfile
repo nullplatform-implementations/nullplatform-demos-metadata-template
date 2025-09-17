@@ -1,14 +1,18 @@
-FROM node:lts-alpine
+FROM node:lts AS BUILD_IMAGE
 
 WORKDIR /usr/src/app
 
 COPY package*.json ./
 
-RUN npm install -g pm2
-RUN npm ci --only=production
+COPY ./package.json ./
+RUN npm install
 
 COPY . .
 
-RUN chmod +x start.sh
+FROM node:lts-alpine
 
-CMD ["./start.sh"]
+WORKDIR /usr/src/app
+
+COPY --from=BUILD_IMAGE /usr/src/app .
+
+CMD ["npm", "run", "start"]
