@@ -270,5 +270,55 @@
             </div>
         </section>
 
+        <!-- Error Generator -->
+        <section class="ds-section">
+            <div class="ds-section-title">Stress Testing</div>
+            <div class="ds-button-card">
+                <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
+                    <button id="error-toggle" class="btn btn-danger" onclick="toggleErrors()">Generate Errors</button>
+                    <span id="error-counter" class="badge badge-primary" style="display: none;">
+                        Requests: <span id="error-count">0</span>
+                    </span>
+                    <span id="error-status" class="ds-type-small"></span>
+                </div>
+            </div>
+        </section>
+
     </main>
 <%- include('partials/footer') %>
+
+<script>
+    let errorInterval = null;
+    let errorCount = 0;
+
+    function toggleErrors() {
+        const btn = document.getElementById('error-toggle');
+        const counter = document.getElementById('error-counter');
+        const status = document.getElementById('error-status');
+
+        if (errorInterval) {
+            clearTimeout(errorInterval);
+            errorInterval = null;
+            btn.textContent = 'Generate Errors';
+            btn.className = 'btn btn-danger';
+            status.textContent = 'Stopped';
+        } else {
+            errorCount = 0;
+            document.getElementById('error-count').textContent = '0';
+            counter.style.display = 'inline-flex';
+            btn.textContent = 'Stop';
+            btn.className = 'btn btn-outline';
+            status.textContent = 'Running...';
+            fireError();
+        }
+    }
+
+    function fireError() {
+        fetch('/api/core-banking/account-summary').then(function () {
+            errorCount++;
+            document.getElementById('error-count').textContent = errorCount;
+        });
+        var delay = Math.floor(Math.random() * 2500);
+        errorInterval = setTimeout(fireError, delay);
+    }
+</script>
