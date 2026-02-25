@@ -20,18 +20,29 @@ jobs:
           api-key: ${{ secrets.NULLPLATFORM_API_KEY }}
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Push metadata
+      - name: Install dependencies
+        run: npm install
+      - name: Install nullplatform CLI
+        run: curl https://cli.nullplatform.com/install.sh | sh
+      - name: Push coverage metadata
         run: |
-          curl https://cli.nullplatform.com/install.sh | sh
-          export COVERAGE=$(cat coverage_report.json| jq .coverage)
-          export DATA='{"coverage":{"percent":'$COVERAGE'}}'
-          echo $DATA
-          np metadata create --entity build --data "$DATA"
-
-          export VULS=$(cat vulnerabilityChecks.json)
-          export DATA='{"security":'$VULS'}'
-          echo $DATA
-          np metadata create --entity build --data "$DATA"
+          npx jest --passWithNoTests --coverage --coverageReporters=json-summary 2>/dev/null || true
+          COVERAGE=0
+          if [ -f coverage/coverage-summary.json ]; then
+            RAW=$(cat coverage/coverage-summary.json | jq '.total.statements.pct')
+            if [ "$RAW" != "\"Unknown\"" ] && [ "$RAW" != "null" ]; then
+              COVERAGE=$RAW
+            fi
+          fi
+          np metadata create --entity build --data '{"coverage":{"percent":'$COVERAGE'}}'
+      - name: Push vulnerability metadata
+        run: |
+          AUDIT=$(npm audit --json 2>/dev/null || true)
+          CRITICAL=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.critical // 0')
+          HIGH=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.high // 0')
+          MODERATE=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.moderate // 0')
+          LOW=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.low // 0')
+          np metadata create --entity build --data '{"security":{"critical":'$CRITICAL',"high":'$HIGH',"moderate":'$MODERATE',"low":'$LOW'}}'
     outputs:
       application-id: ${{ steps.setup-ci.outputs.application-id }}
       application-name: ${{ steps.setup-ci.outputs.application-name }}
@@ -49,14 +60,14 @@ jobs:
         with:
           api-key: ${{ secrets.NULLPLATFORM_API_KEY }}
           application-id: ${{ needs.prepare.outputs.application-id }}
-      - name: Build asset for ${{ needs.prepare.outputs.application-name }} and asset type {{ matrix.asset }}
+      - name: Build asset for ${{ needs.prepare.outputs.application-name }} and asset type ${{ matrix.asset }}
         id: build-asset
         uses: nullplatform/github-action-asset-build@v1
         with:
           name: ${{ matrix.asset }}-asset
           type: ${{ matrix.asset }}
           arguments: build-${{ matrix.asset }}
-      - name: Push asset for ${{ needs.prepare.outputs.application-name }} and asset type {{ matrix.asset }}
+      - name: Push asset for ${{ needs.prepare.outputs.application-name }} and asset type ${{ matrix.asset }}
         id: push-asset
         uses: nullplatform/github-action-asset-push@v1
         with:
