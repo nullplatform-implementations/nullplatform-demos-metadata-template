@@ -40,9 +40,7 @@ jobs:
           AUDIT=$(npm audit --json 2>/dev/null || true)
           CRITICAL=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.critical // 0')
           HIGH=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.high // 0')
-          MODERATE=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.moderate // 0')
-          LOW=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.low // 0')
-          np metadata create --entity build --data '{"security":{"critical":'$CRITICAL',"high":'$HIGH',"moderate":'$MODERATE',"low":'$LOW'}}'
+          np metadata create --entity build --data '{"security":{"critical":'$CRITICAL',"high":'$HIGH'}}'
     outputs:
       application-id: ${{ steps.setup-ci.outputs.application-id }}
       application-name: ${{ steps.setup-ci.outputs.application-name }}
