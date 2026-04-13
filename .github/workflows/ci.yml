@@ -10,80 +10,47 @@ permissions:
   contents: read
   packages: read
 jobs:
-  prepare:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Start Nullplatform CI
-        id: setup-ci
-        uses: nullplatform/github-action-setup-ci@v1
-        with:
-          api-key: ${{ secrets.NULLPLATFORM_API_KEY }}
+      - name: Install nullplatform cli
+        run: curl https://cli.nullplatform.com/install.sh | sh
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Start nullplatform CI
+        run: np build start
       - name: Install dependencies
         run: npm install
-      - name: Install nullplatform CLI
-        run: curl https://cli.nullplatform.com/install.sh | sh
       - name: Push coverage metadata
         run: |
           npx jest --passWithNoTests --coverage --coverageReporters=json-summary 2>/dev/null || true
           COVERAGE=0
+          STATEMENTS='{"total":0,"covered":0,"skipped":0,"percent":0}'
+          LINES='{"total":0,"covered":0,"skipped":0,"percent":0}'
+          FUNCTIONS='{"total":0,"covered":0,"skipped":0,"percent":0}'
+          BRANCHES='{"total":0,"covered":0,"skipped":0,"percent":0}'
           if [ -f coverage/coverage-summary.json ]; then
-            RAW=$(cat coverage/coverage-summary.json | jq '.total.statements.pct')
+            SUMMARY=$(cat coverage/coverage-summary.json)
+            RAW=$(echo "$SUMMARY" | jq '.total.statements.pct')
             if [ "$RAW" != "\"Unknown\"" ] && [ "$RAW" != "null" ]; then
               COVERAGE=$RAW
             fi
+            STATEMENTS=$(echo "$SUMMARY" | jq '.total.statements | {total:.total,covered:.covered,skipped:.skipped,percent:.pct}')
+            LINES=$(echo "$SUMMARY" | jq '.total.lines | {total:.total,covered:.covered,skipped:.skipped,percent:.pct}')
+            FUNCTIONS=$(echo "$SUMMARY" | jq '.total.functions | {total:.total,covered:.covered,skipped:.skipped,percent:.pct}')
+            BRANCHES=$(echo "$SUMMARY" | jq '.total.branches | {total:.total,covered:.covered,skipped:.skipped,percent:.pct}')
           fi
-          np metadata create --entity build --data '{"coverage":{"percent":'$COVERAGE'}}'
+          np metadata create --entity build --data "{\"coverage\":{\"percent\":$COVERAGE,\"statements\":$STATEMENTS,\"lines\":$LINES,\"functions\":$FUNCTIONS,\"branches\":$BRANCHES}}"
       - name: Push vulnerability metadata
         run: |
           AUDIT=$(npm audit --json 2>/dev/null || true)
           CRITICAL=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.critical // 0')
           HIGH=$(echo "$AUDIT" | jq '.metadata.vulnerabilities.high // 0')
           np metadata create --entity build --data '{"security":{"critical":'$CRITICAL',"high":'$HIGH'}}'
-    outputs:
-      application-id: ${{ steps.setup-ci.outputs.application-id }}
-      application-name: ${{ steps.setup-ci.outputs.application-name }}
-      build-id: ${{ steps.setup-ci.outputs.build-id }}
-  build:
-    runs-on: ubuntu-latest
-    needs: prepare
-    strategy:
-      matrix:
-        asset: [lambda, docker-image]
-    steps:
-      - name: Get build parameters
-        id: get-build-parameters
-        uses: nullplatform/github-action-secrets-and-variables@v1
-        with:
-          api-key: ${{ secrets.NULLPLATFORM_API_KEY }}
-          application-id: ${{ needs.prepare.outputs.application-id }}
-      - name: Build asset for ${{ needs.prepare.outputs.application-name }} and asset type ${{ matrix.asset }}
-        id: build-asset
-        uses: nullplatform/github-action-asset-build@v1
-        with:
-          name: ${{ matrix.asset }}-asset
-          type: ${{ matrix.asset }}
-          arguments: build-${{ matrix.asset }}
-      - name: Push asset for ${{ needs.prepare.outputs.application-name }} and asset type ${{ matrix.asset }}
-        id: push-asset
-        uses: nullplatform/github-action-asset-push@v1
-        with:
-          name: ${{ matrix.asset }}-asset
-          build-id: ${{ needs.prepare.outputs.build-id }}
-          type: ${{ matrix.asset }}
-    outputs:
-      build-id: ${{ needs.prepare.outputs.build-id }}
-      status: ${{ contains(fromJSON('["failure", "cancelled"]'), job.status) && 'failed' || 'successful' }}
-  finalize:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: End Nullplatform CI
+      - name: Build asset
+        run: docker build -t main .
+      - name: Push asset
+        run: np asset push --type docker-image --source main
+      - name: End nullplatform CI
         if: ${{ always() }}
-        id: end-setup-ci
-        uses: nullplatform/github-action-setup-ci@v1
-        with:
-          api-key: ${{ secrets.NULLPLATFORM_API_KEY }}
-          build-id: ${{ needs.build.outputs.build-id }}
-          status: ${{ needs.build.outputs.status }}
+        run: np build update --status ${{ contains(fromJSON('["failure", "cancelled"]'), job.status) && 'failed' || 'successful' }}
